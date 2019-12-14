@@ -274,10 +274,27 @@ resource "aws_security_group" "eden_rds_sg" {
 
   #SQL access from public and private SGs
   ingress {
-    from_port       = 3306
-    to_port         = 3006
+    from_port       = 5432
+    to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.eden_web_sg.id, aws_security_group.eden_app_sg.id]
   }
+}
+
+
+
+#---RDS Instances---
+
+resource "aws_db_instance" "eden_db" {
+  allocated_storage = 1
+  engine = "postgresql"
+  engine_version = "11.5-R1"
+  instance_class = var.db_instance_class
+  name = var.db_name
+  username = var.db_user
+  password = var.db_password
+  db_subnet_group_name = aws_db_subnet_group.eden_rds_subnetgroup.name
+  vpc_security_group_ids = [aws_security_group.eden_rds_sg.id]
+  skip_final_snapshot = true
 }
 

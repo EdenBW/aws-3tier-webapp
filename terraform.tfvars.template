@@ -18,3 +18,8 @@ cidrs       = {
     rds2     = "10.0.6.0/24"
     rds3     = "10.0.7.0/24"
 }
+
+db_instance_class = "db.t3.micro"
+db_name = "123"
+db_user = "123"
+db_password = "123"
