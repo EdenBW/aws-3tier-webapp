@@ -23,3 +23,11 @@ db_instance_class = "db.t3.micro"
 db_name = "123"
 db_user = "123"
 db_password = "123"
+
+
+elb_healthy_threshold = "2"
+elb_unhealthy_threshold = "10"
+elb_interval = "30"
+elb_timeout = "3"
+elb_drain_timeout = "400"
+elb_idle_timeout = "400"

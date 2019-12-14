@@ -177,45 +177,6 @@ resource "aws_route_table_association" "eden_private2_assoc" {
 }
 
 
-#--- ELB ---
-
-resource "aws_elb" "eden_web_elb" {
-  name = "eden-web-elb"
-  availability_zones = [data.aws_availability_zones.available.names[0],
-  data.aws_availability_zones.available.names[1]]
-
-  listener {
-    instance_port     = 8000
-    instance_protocol = "http"
-    lb_port           = 80
-    lb_protocol       = "http"
-  }
-
-  tags = {
-    name = "eden_web_elb"
-  }
-
-}
-
-resource "aws_elb" "eden_app_elb" {
-  name = "eden-app-elb"
-  availability_zones = [data.aws_availability_zones.available.names[0],
-  data.aws_availability_zones.available.names[1]]
-
-  internal = true
-
-  listener {
-    instance_port     = 8002
-    instance_protocol = "http"
-    lb_port           = 8111
-    lb_protocol       = "http"
-  }
-
-  tags = {
-    name = "eden_app_elb"
-  }
-}
-
 
 
 
@@ -224,7 +185,7 @@ resource "aws_elb" "eden_app_elb" {
 #Public
 resource "aws_security_group" "eden_web_sg" {
   name        = "eden_web_sg"
-  description = "Used tby ELB for public access to web servers"
+  description = "Used by ELB for public access to web servers"
   vpc_id      = aws_vpc.eden_vpc.id
 
   #http from anywhere
@@ -247,7 +208,7 @@ resource "aws_security_group" "eden_web_sg" {
 #Private
 resource "aws_security_group" "eden_app_sg" {
   name        = "eden_app_sg"
-  description = "Used for frontend -> backend comms"
+  description = "Used for frontend to backend comms"
   vpc_id      = aws_vpc.eden_vpc.id
 
   #HTTP
@@ -282,19 +243,91 @@ resource "aws_security_group" "eden_rds_sg" {
 }
 
 
+#--- ELB ---
+
+resource "aws_elb" "eden_web_elb" {
+  name = "eden-web-elb"
+
+  subnets = [aws_subnet.eden_public1_subnet.id,
+  aws_subnet.eden_public2_subnet.id]
+
+  security_groups = [aws_security_group.eden_web_sg.id]
+
+  listener {
+    instance_port     = 80
+    instance_protocol = "http"
+    lb_port           = 80
+    lb_protocol       = "http"
+  }
+
+  health_check {
+    healthy_threshold   = var.elb_healthy_threshold
+    unhealthy_threshold = var.elb_unhealthy_threshold
+    timeout             = var.elb_timeout
+    target              = "HTTP:80/index.html"
+    interval            = var.elb_interval
+  }
+
+  cross_zone_load_balancing   = true
+  idle_timeout                = var.elb_timeout
+  connection_draining         = true
+  connection_draining_timeout = var.elb_drain_timeout
+
+  tags = {
+    name = "eden_web_elb"
+  }
+}
+
+resource "aws_elb" "eden_app_elb" {
+  name = "eden-app-elb"
+
+  subnets = [aws_subnet.eden_private1_subnet.id,
+  aws_subnet.eden_private2_subnet.id]
+
+  security_groups = [aws_security_group.eden_app_sg.id]
+
+  internal = true
+
+  listener {
+    instance_port     = 8002
+    instance_protocol = "TCP"
+    lb_port           = 8111
+    lb_protocol       = "TCP"
+  }
+
+  health_check {
+    healthy_threshold   = var.elb_healthy_threshold
+    unhealthy_threshold = var.elb_unhealthy_threshold
+    timeout             = var.elb_timeout
+    target              = "TCP:8002"
+    interval            = var.elb_interval
+  }
+
+  cross_zone_load_balancing   = true
+  idle_timeout                = var.elb_idle_timeout
+  connection_draining         = true
+  connection_draining_timeout = var.elb_drain_timeout
+
+  tags = {
+    name = "eden_app_elb"
+  }
+}
+
+
+
 
 #---RDS Instances---
 
 resource "aws_db_instance" "eden_db" {
-  allocated_storage = 1
-  engine = "postgresql"
-  engine_version = "11.5-R1"
-  instance_class = var.db_instance_class
-  name = var.db_name
-  username = var.db_user
-  password = var.db_password
-  db_subnet_group_name = aws_db_subnet_group.eden_rds_subnetgroup.name
+  allocated_storage      = 10
+  engine                 = "postgres"
+  engine_version         = "11.5"
+  instance_class         = var.db_instance_class
+  name                   = var.db_name
+  username               = var.db_user
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.eden_rds_subnetgroup.name
   vpc_security_group_ids = [aws_security_group.eden_rds_sg.id]
-  skip_final_snapshot = true
+  skip_final_snapshot    = true
 }
 
