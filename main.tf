@@ -182,7 +182,7 @@ resource "aws_route_table_association" "eden_private2_assoc" {
 resource "aws_elb" "eden_web_elb" {
   name = "eden-web-elb"
   availability_zones = [data.aws_availability_zones.available.names[0],
-    data.aws_availability_zones.available.names[1]]
+  data.aws_availability_zones.available.names[1]]
 
   listener {
     instance_port     = 8000
@@ -198,9 +198,9 @@ resource "aws_elb" "eden_web_elb" {
 }
 
 resource "aws_elb" "eden_app_elb" {
-  name               = "eden-app-elb"
+  name = "eden-app-elb"
   availability_zones = [data.aws_availability_zones.available.names[0],
-    data.aws_availability_zones.available.names[1]]
+  data.aws_availability_zones.available.names[1]]
 
   internal = true
 
@@ -215,3 +215,69 @@ resource "aws_elb" "eden_app_elb" {
     name = "eden_app_elb"
   }
 }
+
+
+
+
+#--- Security Groups
+
+#Public
+resource "aws_security_group" "eden_web_sg" {
+  name        = "eden_web_sg"
+  description = "Used tby ELB for public access to web servers"
+  vpc_id      = aws_vpc.eden_vpc.id
+
+  #http from anywhere
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # For the sake of this exercise, allow all traffic out
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+#Private
+resource "aws_security_group" "eden_app_sg" {
+  name        = "eden_app_sg"
+  description = "Used for frontend -> backend comms"
+  vpc_id      = aws_vpc.eden_vpc.id
+
+  #HTTP
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+#RDS Security Group
+resource "aws_security_group" "eden_rds_sg" {
+  name        = "eden_rds_sg"
+  description = "Used for RDS instances"
+  vpc_id      = aws_vpc.eden_vpc.id
+
+  #SQL access from public and private SGs
+  ingress {
+    from_port       = 3306
+    to_port         = 3006
+    protocol        = "tcp"
+    security_groups = [aws_security_group.eden_web_sg.id, aws_security_group.eden_app_sg.id]
+  }
+}
+
