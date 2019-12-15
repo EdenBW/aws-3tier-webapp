@@ -154,7 +154,6 @@ resource "aws_db_subnet_group" "eden_rds_subnetgroup" {
   }
 }
 
-
 #Subnet associations
 resource "aws_route_table_association" "eden_public1_assoc" {
   subnet_id      = aws_subnet.eden_public1_subnet.id
@@ -318,16 +317,122 @@ resource "aws_elb" "eden_app_elb" {
 
 #---RDS Instances---
 
-resource "aws_db_instance" "eden_db" {
-  allocated_storage      = 10
-  engine                 = "postgres"
-  engine_version         = "11.5"
-  instance_class         = var.db_instance_class
-  name                   = var.db_name
-  username               = var.db_user
-  password               = var.db_password
-  db_subnet_group_name   = aws_db_subnet_group.eden_rds_subnetgroup.name
-  vpc_security_group_ids = [aws_security_group.eden_rds_sg.id]
-  skip_final_snapshot    = true
+resource "aws_db_instance" "eden_primary_db" {
+  allocated_storage       = 10
+  engine                  = "postgres"
+  engine_version          = "11.5"
+  instance_class          = var.db_instance_class
+  name                    = var.db_name
+  username                = var.db_user
+  password                = var.db_password
+  db_subnet_group_name    = aws_db_subnet_group.eden_rds_subnetgroup.name
+  vpc_security_group_ids  = [aws_security_group.eden_rds_sg.id]
+  skip_final_snapshot     = true
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  apply_immediately       = false
+  backup_retention_period = var.db_bak_retention
+  deletion_protection     = true
+  publicly_accessible     = false
+
 }
 
+
+
+resource "aws_db_instance" "eden_replica_db" {
+
+  instance_class         = var.db_instance_class
+  vpc_security_group_ids = [aws_security_group.eden_rds_sg.id]
+  availability_zone      = data.aws_availability_zones.available.names[1]
+
+  replicate_source_db = aws_db_instance.eden_primary_db.id
+}
+
+
+#---ASG Configs---
+
+# Web frontend
+
+# Using standard AWS AMI for tnis exercise
+resource "aws_launch_configuration" "eden_web_lc" {
+  name_prefix     = "eden_web_lc-"
+  image_id        = var.web_ami
+  instance_type   = var.web_lc_instance_type
+  security_groups = [aws_security_group.eden_web_sg.id]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "eden_web_asg" {
+  name                      = aws_launch_configuration.eden_web_lc.id
+  max_size                  = var.asg_web_max
+  min_size                  = var.asg_web_min
+  health_check_grace_period = var.asg_web_grace
+  health_check_type         = var.asg_web_hct
+  desired_capacity          = var.asg_web_cap
+  force_delete              = true
+  load_balancers            = [aws_elb.eden_web_elb.id]
+
+  vpc_zone_identifier = [aws_subnet.eden_public1_subnet.id,
+  aws_subnet.eden_public2_subnet.id]
+
+  availability_zones = [data.aws_availability_zones.available.names[0],
+  data.aws_availability_zones.available.names[1]]
+
+  launch_configuration = aws_launch_configuration.eden_web_lc.name
+
+  tag {
+    key                 = "Name"
+    value               = "eden_web-instance"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+
+# App servers
+
+# Using standard AWS AMI for tnis exercise
+resource "aws_launch_configuration" "eden_app_lc" {
+  name_prefix     = "eden_app_lc-"
+  image_id        = var.app_ami
+  instance_type   = var.app_lc_instance_type
+  security_groups = [aws_security_group.eden_app_sg.id]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "eden_app_asg" {
+  name                      = aws_launch_configuration.eden_app_lc.id
+  max_size                  = var.asg_app_max
+  min_size                  = var.asg_app_min
+  health_check_grace_period = var.asg_app_grace
+  health_check_type         = var.asg_app_hct
+  desired_capacity          = var.asg_app_cap
+  force_delete              = true
+  load_balancers            = [aws_elb.eden_app_elb.id]
+
+  vpc_zone_identifier = [aws_subnet.eden_private1_subnet.id,
+  aws_subnet.eden_private2_subnet.id]
+
+  availability_zones = [data.aws_availability_zones.available.names[0],
+  data.aws_availability_zones.available.names[1]]
+
+  launch_configuration = aws_launch_configuration.eden_app_lc.name
+
+  tag {
+    key                 = "Name"
+    value               = "eden_app-instance"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}

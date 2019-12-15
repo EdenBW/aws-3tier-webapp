@@ -3,7 +3,7 @@ aws_profile    = "terraform"
 aws_access_key = "asd123"
 aws_secret_key = "asd123"
 
-dxgw_asn    = "12345"
+dxgw_asn    = "64513"
 dx_location = "DC1"
 
 
@@ -23,7 +23,7 @@ db_instance_class = "db.t3.micro"
 db_name = "123"
 db_user = "123"
 db_password = "123"
-
+db_bak_retention  = "3"
 
 elb_healthy_threshold = "2"
 elb_unhealthy_threshold = "10"
@@ -31,3 +31,22 @@ elb_interval = "30"
 elb_timeout = "3"
 elb_drain_timeout = "400"
 elb_idle_timeout = "400"
+
+
+
+web_ami              = "ami-00068cd7555f543d5"
+web_lc_instance_type = "t2.micro"
+asg_web_max          = "2"
+asg_web_min          = "1"
+asg_web_grace        = "300"
+asg_web_hct          = "EC2"
+asg_web_cap          = "2"
+
+
+app_ami              = "ami-00068cd7555f543d5"
+app_lc_instance_type = "t2.micro"
+asg_app_max          = "2"
+asg_app_min          = "1"
+asg_app_grace        = "300"
+asg_app_hct          = "EC2"
+asg_app_cap          = "2"
